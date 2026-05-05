@@ -70,6 +70,27 @@ Du har to valg: Neo4j Browser (innebygd) eller den enkle GUI-en (anbefalt for fa
 
 Tips: Klikk på "Graph"-visning øverst til venstre i resultatet for å se relasjonene visuelt.
 
+## Deployment til GitHub Pages
+
+GUI-en kan deployes til GitHub Pages for deling med andre uten å kreve lokal Docker-oppsett.
+
+**Forutsetninger:**
+- Git repository på GitHub
+- Neo4j-instans som er tilgjengelig fra internett (eller bruk lokalt via tunnel)
+
+**Oppsett:**
+
+1. Push denne repoet til GitHub
+2. Gå til repository-innstillinger → **Pages**
+3. Velg "Deploy from a branch" og branch `gh-pages`
+4. Konfigurer Neo4j-forbindelsen:
+   - **Enklest:** Besøk `https://brukernavn.github.io/statnett-kg-mvp/?neo4j_uri=bolt://your-server:7687&neo4j_user=neo4j&neo4j_password=passord`
+   - **Sikrare:** Bruk GitHub Secrets (se `docs/github-pages-setup.md`)
+
+GitHub Actions deployer automatisk når du pusher til `main` eller `master`.
+
+Se [GitHub Pages Setup Guide](docs/github-pages-setup.md) for detaljerte instruksjoner.
+
 ## Struktur
 
 ```

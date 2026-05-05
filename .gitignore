@@ -13,3 +13,6 @@ Thumbs.db
 
 # Lokale notater
 NOTES.local.md
+
+# GUI-konfigurasjon (inneholder hemmeligheter)
+gui/config.js

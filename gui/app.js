@@ -2,11 +2,27 @@
 // app.js
 // Kobler til Neo4j via JavaScript-driver, kjører spørringer,
 // og viser resultatene som graf eller tabell.
+//
+// Konfigurering: Bruk URL-parametre for å overstyre Neo4j-innstillinger:
+//   ?neo4j_uri=bolt://example.com:7687&neo4j_user=neo4j&neo4j_password=passord
 // =============================================================
 
-const NEO4J_URI = "bolt://localhost:7687";
-const NEO4J_USER = "neo4j";
-const NEO4J_PASSWORD = "mvp-passord-123";
+// Hent konfigurering fra URL-parametre, localStorage, eller bruk defaults
+function getConfig(key, defaultValue) {
+  const params = new URLSearchParams(window.location.search);
+  const urlValue = params.get(key);
+  if (urlValue) {
+    localStorage.setItem(key, urlValue);
+    return urlValue;
+  }
+  const stored = localStorage.getItem(key);
+  if (stored) return stored;
+  return defaultValue;
+}
+
+const NEO4J_URI = getConfig("neo4j_uri", "bolt://localhost:7687");
+const NEO4J_USER = getConfig("neo4j_user", "neo4j");
+const NEO4J_PASSWORD = getConfig("neo4j_password", "mvp-passord-123");
 
 // Fargepalett per node-type
 const COLORS = {
