@@ -1,0 +1,15 @@
+# Neo4j data
+neo4j_data/
+neo4j_logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Lokale notater
+NOTES.local.md

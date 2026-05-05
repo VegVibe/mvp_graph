@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Statnett Kunnskapsgraf — Utforsker</title>
+<script src="https://unpkg.com/neo4j-driver@5.27.0/lib/browser/neo4j-web.min.js"></script>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.9/styles/vis-network.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #f5f6f8;
+    color: #1a2332;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #1a3a5c;
+    color: white;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .status {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #999;
+  }
+  .status-dot.ok { background: #4caf50; }
+  .status-dot.err { background: #e53935; }
+
+  main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 320px;
+    background: white;
+    border-right: 1px solid #e0e3e8;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar h2 {
+    margin: 0;
+    padding: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    border-bottom: 1px solid #e0e3e8;
+    background: #fafbfc;
+  }
+  .search-box {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e3e8;
+    background: white;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .search-input-wrap {
+    position: relative;
+  }
+  #search-input {
+    width: 100%;
+    padding: 8px 32px 8px 32px;
+    border: 1px solid #c4ccd6;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #search-input:focus {
+    border-color: #1a3a5c;
+    box-shadow: 0 0 0 2px rgba(26, 58, 92, 0.1);
+  }
+  .search-icon {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+    font-size: 14px;
+  }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 8px;
+    display: none;
+  }
+  .search-clear.visible { display: block; }
+  .search-clear:hover { color: #1a2332; }
+  .search-hint {
+    font-size: 11px;
+    color: #999;
+    margin-top: 6px;
+  }
+  .question mark {
+    background: #fff3a3;
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+  }
+  .no-results {
+    padding: 24px 16px;
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+  }
+  .question-group.hidden { display: none; }
+  .question.hidden { display: none; }
+  .question-group {
+    border-bottom: 1px solid #e0e3e8;
+  }
+  .group-title {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    background: #fafbfc;
+  }
+  .question {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    font-size: 14px;
+    line-height: 1.4;
+    transition: background 0.15s;
+  }
+  .question:hover {
+    background: #f0f4f8;
+  }
+  .question.active {
+    background: #e3eef9;
+    border-left-color: #1a3a5c;
+    font-weight: 500;
+  }
+  .question .desc {
+    font-size: 12px;
+    color: #777;
+    margin-top: 3px;
+  }
+
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .toolbar {
+    padding: 12px 20px;
+    background: white;
+    border-bottom: 1px solid #e0e3e8;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .toolbar h3 {
+    margin: 0;
+    font-size: 16px;
+    flex: 1;
+  }
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid #c4ccd6;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #1a2332;
+  }
+  .btn:hover { background: #f0f4f8; }
+  .btn.primary {
+    background: #1a3a5c;
+    color: white;
+    border-color: #1a3a5c;
+  }
+  .btn.primary:hover { background: #2c5282; }
+  .btn.active {
+    background: #1a3a5c;
+    color: white;
+    border-color: #1a3a5c;
+  }
+
+  .view-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #fafbfc;
+  }
+  #graph {
+    width: 100%;
+    height: 100%;
+  }
+  #table-view {
+    height: 100%;
+    overflow: auto;
+    padding: 16px;
+    display: none;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    background: white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  th, td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e3e8;
+    font-size: 13px;
+    vertical-align: top;
+  }
+  th {
+    background: #f5f6f8;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+  }
+  td pre {
+    margin: 0;
+    font-family: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  #cypher-view {
+    height: 100%;
+    display: none;
+    flex-direction: column;
+    padding: 16px;
+    gap: 12px;
+  }
+  #cypher-input {
+    flex: 0 0 30%;
+    width: 100%;
+    font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    padding: 12px;
+    border: 1px solid #c4ccd6;
+    border-radius: 4px;
+    resize: none;
+  }
+  #cypher-result {
+    flex: 1;
+    overflow: auto;
+    background: white;
+    border: 1px solid #e0e3e8;
+    border-radius: 4px;
+    padding: 12px;
+  }
+
+  .detail-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 320px;
+    max-height: calc(100% - 24px);
+    background: white;
+    border: 1px solid #e0e3e8;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+  }
+  .detail-panel.visible { display: flex; }
+  .detail-header {
+    padding: 12px 16px;
+    background: #1a3a5c;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .detail-header h4 { margin: 0; font-size: 14px; }
+  .detail-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .detail-body { padding: 12px 16px; overflow-y: auto; }
+  .detail-body .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #999;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .detail-body .value {
+    margin-bottom: 10px;
+    font-size: 13px;
+    word-break: break-word;
+  }
+  .detail-body .type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #e3eef9;
+    color: #1a3a5c;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .empty-state {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #888;
+    text-align: center;
+    padding: 40px;
+  }
+  .empty-state h3 {
+    color: #555;
+    margin: 0 0 8px;
+  }
+
+  .loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #666;
+    font-size: 14px;
+  }
+  .error {
+    background: #fee;
+    color: #c00;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px;
+    font-size: 13px;
+    border-left: 4px solid #c00;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Statnett Kunnskapsgraf — Utforsker</h1>
+  <div class="status">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">Kobler til...</span>
+  </div>
+</header>
+
+<main>
+  <aside class="sidebar">
+    <div class="search-box">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Søk i spørsmål..." autocomplete="off">
+        <button class="search-clear" id="search-clear" title="Tøm søk">×</button>
+      </div>
+      <div class="search-hint" id="search-hint">Prøv "risiko", "trolla", "krav" eller "milepæl"</div>
+    </div>
+    <h2>Spørsmål</h2>
+    <div id="question-list"></div>
+    <div id="static-actions">
+      <h2 style="margin-top: 0;">Annet</h2>
+      <div class="question" data-action="cypher">
+        Skriv egen Cypher-spørring
+        <div class="desc">For deg som vil utforske selv</div>
+      </div>
+      <div class="question" data-action="overview">
+        Vis hele grafen
+        <div class="desc">Alle noder og relasjoner (begrenset til 200)</div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="content">
+    <div class="toolbar">
+      <h3 id="current-title">Velg et spørsmål</h3>
+      <button class="btn" id="btn-graph">Graf</button>
+      <button class="btn" id="btn-table">Tabell</button>
+    </div>
+    <div class="view-area">
+      <div id="graph"></div>
+      <div id="table-view"></div>
+      <div id="cypher-view">
+        <textarea id="cypher-input" placeholder="MATCH (n) RETURN n LIMIT 25"></textarea>
+        <button class="btn primary" id="run-cypher" style="align-self: flex-start;">Kjør spørring</button>
+        <div id="cypher-result"></div>
+      </div>
+      <div id="empty" class="empty-state">
+        <h3>Velkommen</h3>
+        <p>Velg et spørsmål fra menyen til venstre for å utforske kunnskapsgrafen.</p>
+      </div>
+      <div class="detail-panel" id="detail-panel">
+        <div class="detail-header">
+          <h4 id="detail-title">Detaljer</h4>
+          <button class="detail-close" id="detail-close">×</button>
+        </div>
+        <div class="detail-body" id="detail-body"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
